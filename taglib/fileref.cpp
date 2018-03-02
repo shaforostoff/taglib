@@ -102,6 +102,8 @@ namespace
 
     if(ext == "MP3")
       return new MPEG::File(stream, ID3v2::FrameFactory::instance(), readAudioProperties, audioPropertiesStyle);
+    if(ext == "AAC")
+      return new MPEG::File(stream, ID3v2::FrameFactory::instance(), readAudioProperties, audioPropertiesStyle, MPEG::File::ADTS);
     if(ext == "OGG")
       return new Ogg::Vorbis::File(stream, readAudioProperties, audioPropertiesStyle);
     if(ext == "FLAC")
@@ -367,6 +369,7 @@ StringList FileRef::defaultFileExtensions()
   l.append("wv");
   l.append("spx");
   l.append("tta");
+  l.append("aac");
   l.append("m4a");
   l.append("m4r");
   l.append("m4b");

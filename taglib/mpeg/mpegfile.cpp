@@ -54,7 +54,8 @@ public:
     APELocation(-1),
     APEOriginalSize(0),
     ID3v1Location(-1),
-    properties(0) {}
+    properties(0),
+    container(MPEG) {}
 
   ~FilePrivate()
   {
@@ -74,6 +75,8 @@ public:
   TagUnion tag;
 
   Properties *properties;
+
+  ContainerFormat container;
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -158,6 +161,26 @@ MPEG::File::File(IOStream *stream, ID3v2::FrameFactory *frameFactory,
     read(readProperties);
 }
 
+MPEG::File::File(FileName file, ID3v2::FrameFactory *frameFactory,
+                 bool readProperties, Properties::ReadStyle, ContainerFormat format) :
+  TagLib::File(file),
+  d(new FilePrivate(frameFactory))
+{
+  d->container = format;
+  if(isOpen())
+    read(readProperties);
+}
+
+MPEG::File::File(IOStream *stream, ID3v2::FrameFactory *frameFactory,
+                 bool readProperties, Properties::ReadStyle, ContainerFormat format) :
+  TagLib::File(stream),
+  d(new FilePrivate(frameFactory))
+{
+  d->container = format;
+  if(isOpen())
+    read(readProperties);
+}
+
 MPEG::File::~File()
 {
   delete d;
@@ -217,6 +240,11 @@ bool MPEG::File::save(int tags, bool stripOthers, int id3v2Version, bool duplica
 {
   if(readOnly()) {
     debug("MPEG::File::save() -- File is read only.");
+    return false;
+  }
+
+  if(d->container == ADTS) {
+    debug("MPEG::File::save() -- Modifying Raw AAC (ADTS) files is not supported.");
     return false;
   }
 
@@ -350,6 +378,11 @@ bool MPEG::File::strip(int tags, bool freeMemory)
     return false;
   }
 
+  if(d->container == ADTS) {
+    debug("MPEG::File::save() -- Modifying Raw AAC (ADTS) files is not supported.");
+    return false;
+  }
+
   if((tags & ID3v2) && d->ID3v2Location >= 0) {
     removeBlock(d->ID3v2Location, d->ID3v2OriginalSize);
 
@@ -410,7 +443,7 @@ long MPEG::File::nextFrameOffset(long position)
       frameSyncBytes[0] = frameSyncBytes[1];
       frameSyncBytes[1] = buffer[i];
       if(isFrameSync(frameSyncBytes)) {
-        const Header header(this, position + i - 1, true);
+        const Header header(this, position + i - 1, d->container == MPEG);
         if(header.isValid())
           return position + i - 1;
       }
@@ -435,7 +468,7 @@ long MPEG::File::previousFrameOffset(long position)
       frameSyncBytes[1] = frameSyncBytes[0];
       frameSyncBytes[0] = buffer[i];
       if(isFrameSync(frameSyncBytes)) {
-        const Header header(this, position + i, true);
+        const Header header(this, position + i, d->container == MPEG);
         if(header.isValid())
           return position + i + header.frameLength();
       }
@@ -572,4 +605,9 @@ long MPEG::File::findID3v2()
 
     position += bufferSize();
   }
+}
+
+MPEG::File::ContainerFormat MPEG::File::containerFormat() const
+{
+  return d->container;
 }
